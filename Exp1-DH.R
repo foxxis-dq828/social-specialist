@@ -139,7 +139,7 @@ res <- uniroot(q, interval = c(1, 10))
 n <-res$root
 
 f <- function(d) {
-  (1 + 2*28.73571*d)/(2 + 2*28.73571*d) -  n2}
+  (1 + 2*n*d)/(2 + 2*n*d) -  n2}
 res2 <- uniroot(f, interval = c(0, 100000))
 eta<-res2$root  
 
