@@ -1,0 +1,249 @@
+---
+title: "exp1"
+format: html
+editor: visual
+---
+
+## Load the Data
+
+```{r}
+library(GenSA)
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(readxl)
+data <- read_excel("/Users/foxxis/Documents/social induction/experiment data/exp1/output100.xlsx")
+data
+
+
+#add a new id to everyone
+data <- data %>% 
+  mutate(id=paste0('p', row_number()))
+data
+
+```
+
+## Descriptive Analysis
+
+```{r}
+final_data <- data %>%
+  mutate(
+    age = as.numeric(age),
+    education = as.numeric(education),
+    gender = as.factor(gender)
+  )
+
+
+#turn to numeric 
+final_data <- final_data %>%
+  mutate(
+    div = as.numeric(av_pdiv)*2,
+    nodiv = as.numeric(av_nodiv)*2
+  )
+
+rate_data <- final_data %>%
+  select( div, nodiv)
+
+# descriptive analysis
+summary_stats <- summary(rate_data)
+print(summary_stats)
+
+sd_value <- sd(rate_data$div, na.rm = TRUE)
+cat("SD div:", sd_value, "\n")
+
+sd_value <- sd(rate_data$nodiv, na.rm = TRUE)
+cat("SD nodiv:", sd_value, "\n")
+
+div_bigger <- sum(final_data$div > final_data$nodiv, na.rm = TRUE)
+nodiv_bigger <- sum(final_data$div < final_data$nodiv, na.rm = TRUE)
+equal <- sum(final_data$div == final_data$nodiv, na.rm = TRUE)
+cat("Div > NoDiv:", div_bigger/101,  "\n")
+cat("Nodiv > Div:", nodiv_bigger/101, "\n")
+cat("Div = NoDiv:", equal/101, "\n")
+
+```
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(rstatix)
+library(ggpubr)
+
+
+plot_data <- final_data %>%
+  select(ip, div, nodiv) %>%
+  pivot_longer(cols = c(div, nodiv),
+               names_to = "type",
+               values_to = "value")
+
+
+# Normality (per condition)
+plot_data  %>% group_by(type) %>% shapiro_test(value)
+
+# Repeated-measures ANOVA
+# Mauchly’s test for sphericity & GG/HF corrections
+anova_res <- anova_test(
+  data = plot_data, dv = value, wid = ip, within = type,
+  effect.size = "pes"
+)
+get_anova_table(anova_res, correction = "GG")
+
+
+# Effect sizes (paired Cohen's d)
+es <- plot_data %>%
+  cohens_d(value ~ type, paired = TRUE, var.equal = FALSE)
+
+es
+
+
+# Plot: each participants as each line
+ggplot(plot_data, aes(x = type, y = value, group = ip)) +
+  geom_line(alpha = 0.3) +
+  scale_x_discrete(labels = c("div", "nodiv")) +
+  theme_minimal() +
+  labs(title = "Each Participant's Line Across div, nodiv",
+       x = "Rate Type", y = "Value")
+```
+
+## Significance Test
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+#ANOVA
+t1non <- final_data$d2
+t1div <- final_data$d1
+t2non <- final_data$d4
+t2div <- final_data$d3
+t3non <- final_data$d8
+t3div <- final_data$d7
+t4non <- final_data$d6
+t4div <- final_data$d5
+#calculate the difference within pairs
+t1dif <- t1div -t1non
+t2dif <- -(t2div-t2non)
+t3dif <- -t3div+t3non #Notably, we standardize all choice data by turn trials favoring Jar II into Jar I
+t4dif <- -t4div+t4non
+
+data <- data.frame(
+  participant = factor(1:length(t1dif)),
+  t1 = t1dif,  # vote=yes, model=yes
+  t2 = t2dif,  # vote=no,  model=yes
+  t3 = t3dif,  # vote=yes,  model=no
+  t4 = t4dif   # vote=no, model=no
+)
+
+library(tidyr)
+library(dplyr)
+
+# Create long data for 2x2 repeated-measure anova
+long_data <- data %>%
+  pivot_longer(cols = starts_with("t"), names_to = "condition", values_to = "diff") %>%
+  mutate(
+    vote  = ifelse(condition %in% c("t1", "t3"), "yes", "no"),
+    model = ifelse(condition %in% c("t1", "t2"), "yes", "no"),
+    vote  = factor(vote),
+    model = factor(model)
+  )
+
+
+#descriptive analysis
+long_data  %>%
+  group_by(vote, model) %>%
+  get_summary_stats(diff, type = "mean_sd")
+
+bxp <- ggboxplot(
+  long_data, x = "vote", y = "diff",
+  color = "model", palette = "jco"
+  )
+bxp
+
+#shapiro test
+long_data %>%
+  group_by(vote,model) %>%
+  shapiro_test(diff)
+
+ggqqplot(long_data, "diff", ggtheme = theme_bw()) +
+  facet_grid(vote ~ model, labeller = "label_both") #Although the normality assumption is violated, the deviation is not severe. Given the large sample size (n = 101 ≫ 30), we proceeded with the analysis under the assumption of normality.
+
+
+#ANOVA Result
+aov_results <- long_data %>%
+  anova_test(
+    dv = diff,
+    wid = participant,
+    within = c(vote, model)
+  )
+get_anova_table(aov_results)
+
+pwc_model_within_vote <- long_data %>%
+  group_by(vote) %>%
+  pairwise_t_test(
+    diff ~ model,
+    paired = TRUE,
+    p.adjust.method = "bonferroni"
+  )
+
+pwc_vote_within_model <- long_data %>%
+  group_by(model) %>%
+  pairwise_t_test(
+    diff ~ vote,
+    paired = TRUE,
+    p.adjust.method = "bonferroni"
+  )
+
+pwc_model_within_vote
+pwc_vote_within_model
+
+# Visualization: box plots with p-values
+pwc_model_within_vote <- pwc_model_within_vote %>% 
+  add_xy_position(x = "vote")
+
+# Create your base plot
+bxp + 
+  labs(
+    caption = get_pwc_label(pwc_model_within_vote)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),  
+    axis.title = element_text(face = "bold", size = 12),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 10),
+    panel.background = element_rect(fill = "white", color = "black", size = 1),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank(),  
+    axis.line = element_line(size = 0.5, color = "black")
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0.5, size = 10, face = "italic")  
+  )
+#Finally, one sample t-test for each condition
+print(t.test(t1dif, mu=0))
+print(t.test(t2dif, mu=0))
+print(t.test(t3dif, mu=0))
+print(t.test(t4dif, mu=0))
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+long_data
+p<-ggplot(long_data, aes(x=vote, y=diff, fill=model))+
+  geom_boxplot()
+ 
+
+p+scale_fill_manual(values=c("gold", "#48D1CC"))+
+  theme_classic()+
+  geom_segment(aes(x = 1, xend = 2, y = 3.5, yend = 3.5), color = "black", linewidth = 1) +  
+  geom_text(aes(x = 1.5, y = 3.7, label = "***"), size = 6, color = "black") +
+  theme(
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)  
+  )
+
+```

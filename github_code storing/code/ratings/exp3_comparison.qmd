@@ -1,0 +1,179 @@
+---
+title: "data_analysis tau for social agent exp3 (revise expertise information)"
+format: html
+editor: visual
+---
+
+## Load the Data
+
+```{r}
+library(readxl)
+final_data <- read_excel("/Users/foxxis/Documents/social induction/experiment data/exp3/final_data.xlsx")
+final_data
+
+
+```
+
+## Descriptive Analysis
+
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+final_data <- final_data %>%
+  mutate(
+    age = as.numeric(age),
+    education = as.numeric(education),
+    Group = as.factor(Group),
+    gender = as.factor(gender)
+  )
+summary(final_data[, c("age", "education", "totalcorrect")])
+table(final_data$gender)
+table(final_data$Group)
+
+# turn to numeric
+final_data <- final_data %>%
+  mutate(
+    Ear = as.numeric(Ear),
+    Foot = as.numeric(Foot),
+    div = as.numeric(div),
+    nodiv1 = as.numeric(nodiv1),
+    nodiv2 = as.numeric(nodiv2)
+  )
+
+rate_data <- final_data %>%
+  select(Ear, Foot, div, nodiv1, nodiv2)
+
+# descriptive analysis
+summary_stats <- summary(rate_data)
+print(summary_stats)
+
+ear_bigger <- sum(final_data$Ear > final_data$Foot, na.rm = TRUE)
+foot_bigger <- sum(final_data$Ear < final_data$Foot, na.rm = TRUE)
+equal <- sum(final_data$Ear == final_data$Foot, na.rm = TRUE)
+cat("Ear > Foot:", ear_bigger/96, "\n")
+cat("Foot > Ear:", foot_bigger/96, "\n")
+cat("Foot = Ear:", equal/96, "\n")
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(rstatix)
+library(ggpubr)
+
+
+plot_data <- final_data %>%
+  select(ip, div, nodiv1, nodiv2) %>%
+  pivot_longer(cols = c(div, nodiv1, nodiv2),
+               names_to = "type",
+               values_to = "value")
+
+# Descriptive stats by condition
+desc_stats <- plot_data %>%
+  group_by(type) %>%
+  get_summary_stats(value, 
+                    type = "mean_sd") %>%      # mean ± SD
+  left_join(
+     plot_data %>%
+      group_by(type) %>%
+      summarise(
+        median = median(value, na.rm = TRUE),
+        min    = min(value, na.rm = TRUE),
+        max    = max(value, na.rm = TRUE),
+        ci_low = mean_cl_normal(value)$ymin,
+        ci_up  = mean_cl_normal(value)$ymax,
+        .groups = "drop"
+      ),
+    by = "type"
+  )
+
+desc_stats
+
+# Assumption checks
+# Normality
+plot_data  %>% group_by(type) %>% shapiro_test(value)
+
+# Repeated-measures ANOVA 
+# sphericity 
+anova_res <- anova_test(
+  data = plot_data, dv = value, wid = ip, within = type,
+  effect.size = "pes"
+)
+get_anova_table(anova_res, correction = "GG")
+
+# Post hoc: paired t-tests
+pwc <- plot_data %>%
+  pairwise_t_test(value ~ type, paired = TRUE, p.adjust.method = "bonferroni") %>%
+  add_significance()
+
+# Effect sizes (paired Cohen's d)
+es <- plot_data %>%
+  cohens_d(value ~ type, paired = TRUE, var.equal = FALSE)
+
+pwc
+es
+
+#  plot with p-values 
+bxp <- ggboxplot(plot_data, x = "type", y = "value", add = "point", width = 0.5)
+# position labels for stat_pvalue_manual
+pwc_plot <- pwc %>% add_xy_position(x = "type")
+bxp + stat_pvalue_manual(pwc_plot, tip.length = 0.01, hide.ns = TRUE) +
+  labs(x = "Combination", y = "Rating",
+       subtitle = paste("ANOVA (GG-corrected): F =",
+                        round(get_anova_table(anova_res, correction = "GG")$F[1], 2),
+                        ", p =",
+                        signif(get_anova_table(anova_res, correction = "GG")$p[1], 3)))
+
+# each participants as one line
+ggplot(plot_data, aes(x = type, y = value, group = ip)) +
+  geom_line(alpha = 0.3) +
+  scale_x_discrete(labels = c("div" = "Ear + Foot", "nodiv1" = "2 Ear", "nodiv2" = "2 Foot")) +
+  theme_minimal() +
+  labs(title = "Each Participant's Line Across div, nodiv1, nodiv2",
+       x = "Rate Type", y = "Value")
+
+
+```
+
+## ANOVA
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+#ANOVA
+#add up repeated trial only different in present sequence
+t1 <- (final_data$p1+final_data$p9)/2
+t2 <- (final_data$p2+final_data$p10)/2
+t3 <- (final_data$p3+final_data$p12)/2
+t4 <- (final_data$p4+final_data$p11)/2
+t5 <- (final_data$p5+final_data$p13)/2
+t6 <- (final_data$p6+final_data$p14)/2
+t7 <- (final_data$p7+final_data$p15)/2
+t8 <- (final_data$p8+final_data$p16)/2
+
+#calculate the difference within pairs
+t.test(t2, mu=3.5)
+t.test(t2, mu = 3.5, alternative = "less")
+t.test(t2, mu = 3.5, alternative = "greater")
+
+
+t.test(t3, mu=3.5)
+t.test(t3, mu = 3.5, alternative = "less")
+t.test(t3, mu = 3.5, alternative = "greater")
+
+
+t.test(t4, mu= 3.5)
+t.test(t4, mu = 3.5, alternative = "less")
+t.test(t4, mu = 3.5, alternative = "greater")
+
+mean(t2)
+sd(t2)
+mean(t3)
+sd(t3)
+mean(t4)
+sd(t4)
+
+```
