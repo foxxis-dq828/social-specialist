@@ -1,0 +1,842 @@
+---
+title: "Bayesian Posterior of Mentalizing Model"
+format: html
+editor: visual
+---
+
+## Bayesian Posterior of Mentalizing Models
+
+Exp1
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+```
+
+```{r}
+# In experiment 1, participants know the full distributions of the two jars.
+#
+# Latent world state d: color of the sampled ball
+# Target category c:    identity of the sampled jar
+# Agent knowledge k1/2:  distribution of one ball color
+# Agent judgment s1/s2:   Jar 1 or Jar 2
+#
+# The reasoner computes: P(c | s1, s2) = sum_d P(c | d) P(d | s1, s2)
+# with
+# P(d | s1, s2) ~ P(s1 | d, k1) P(s2 | d, k2) P(d).
+
+#agent response likelihood P(s1 | d, k1), P(s2 | d, k2)
+agent_jar_likelihood <- function(
+    jar1, jar2,
+    color,
+    known_color,
+    response,
+    total_balls,
+    tau) {
+
+  # If the observed color is within the agent's knowledge,
+  # use its known distribution across the two jars.
+  if (color == known_color) {
+
+    p_jar1 <- jar1[[color]] /
+      (jar1[[color]] + jar2[[color]])
+
+  } else {
+
+    # For colors outside the agent's knowledge, the remaining
+    # probability mass is distributed equally across the two
+    # unknown colors.
+    unknown_jar1 <- (total_balls - jar1[[known_color]]) / 2
+    unknown_jar2 <- (total_balls - jar2[[known_color]]) / 2
+
+    p_jar1 <- unknown_jar1 /
+      (unknown_jar1 + unknown_jar2)
+  }
+
+  # Convert the agent's posterior beliefs into response probabilities.
+  response_prob <- softmax(
+    c(p_jar1, 1 - p_jar1),
+    tau
+  )
+
+  # Responses are represented either as 1/2 or Type1/Type2.
+  response_index <- if (is.character(response)) {
+    match(response, c("Type1", "Type2"))
+  } else {
+    as.integer(response)
+  }
+
+  response_prob[response_index]
+}
+
+# posterior
+posterior_exp1 <- function(
+    jar1, jar2,
+    s1, s2,
+    k1, k2,
+    tau) {
+
+  total_balls <- 20
+  colors <- c("blue", "yellow", "red")
+
+  names(jar1) <- colors
+  names(jar2) <- colors
+
+  # Hypothesis space:
+  # 3 possible colors x 2 possible source jars = 6 hypotheses.
+  hypotheses <- expand.grid(
+    color = colors,
+    chosen_jar = 1:2,
+    stringsAsFactors = FALSE
+  )
+
+  weights <- numeric(nrow(hypotheses))
+
+  for (i in seq_len(nrow(hypotheses))) {
+
+    color <- hypotheses$color[i]
+    chosen_jar <- hypotheses$chosen_jar[i]
+
+    # Prior probability of observing this ball color:
+    # P(d)
+    total_color <- jar1[[color]] + jar2[[color]]
+    p_color <- total_color / (2 * total_balls)
+
+    # Probability of the source jar conditional on color:
+    # P(c | d)
+    p_jar <- c(
+      jar1[[color]],
+      jar2[[color]]
+    ) / total_color
+
+    # Agent likelihoods:
+    # P(s1 | d, k1)
+    # P(s2 | d, k2) 
+    ll_s1 <- agent_jar_likelihood(
+      jar1, jar2,
+      color = color,
+      known_color = k1,
+      response = s1,
+      total_balls = total_balls,
+      tau = tau
+    )
+
+    ll_s2 <- agent_jar_likelihood(
+      jar1, jar2,
+      color = color,
+      known_color = k2,
+      response = s2,
+      total_balls = total_balls,
+      tau = tau
+    )
+
+
+    # P(c, d, s1, s2)
+    #  ~  P(c | d)
+    #     P(s1 | c, k1)
+    #     P(s2 | c, k2)
+    #     P(d)
+    
+    weights[i] <-
+      p_jar[chosen_jar] *
+      ll_s1 *
+      ll_s2 *
+      p_color
+  }
+
+  # Marginalize over possible ball colors.
+  jar_weights <- tapply(
+    weights,
+    hypotheses$chosen_jar,
+    sum
+  )
+
+  posterior <- jar_weights / sum(jar_weights)
+
+  # Return P(Jar 2 | s1, s2)
+  unname(posterior["2"])
+}
+
+ # Define a softmax transformation for expert responses. 
+  softmax <- function(x, rtau) {
+    exps <- exp(log(x) * rtau)
+    probabilities <- exps / sum(exps)
+    return(probabilities)
+  }
+  
+
+# ------------------------------------------------------------
+# Experiment 1 trial predictions
+# ------------------------------------------------------------
+
+w_list1 <- function(tau) {
+
+  jar1_list <- list(
+    c(4, 15, 1),
+    c(1, 6, 13),
+    c(1, 4, 15),
+    c(1, 4, 15)
+  )
+
+  jar2_list <- list(
+    c(15, 1, 4),
+    c(4, 15, 1),
+    c(4, 1, 15),
+    c(4, 15, 1)
+  )
+
+  # Different-knowledge condition:
+  # Agent 1 knows blue; Agent 2 knows yellow.
+  response_div <- list(
+    c(1, 2),
+    c(1, 1),
+    c(2, 2),
+    c(2, 1)
+  )
+
+  # Same-knowledge condition:
+  # Both agents know blue.
+  response_nodiv <- list(
+    c(1, 1),
+    c(1, 1),
+    c(2, 2),
+    c(2, 2)
+  )
+
+  posterior <- numeric(8)
+
+  for (i in 1:4) {
+
+    jar1 <- jar1_list[[i]]
+    jar2 <- jar2_list[[i]]
+
+    # Different knowledge
+    posterior[2 * i - 1] <- posterior_exp1(
+      jar1, jar2,
+      s1 = response_div[[i]][1],
+      s2 = response_div[[i]][2],
+      k1 = "blue",
+      k2 = "yellow",
+      tau = tau
+    )
+
+    # Same knowledge
+    posterior[2 * i] <- posterior_exp1(
+      jar1, jar2,
+      s1 = response_nodiv[[i]][1],
+      s2 = response_nodiv[[i]][2],
+      k1 = "blue",
+      k2 = "blue",
+      tau = tau
+    )
+  }
+
+  posterior
+}
+
+
+w_list1(1000)
+```
+
+exp2
+
+```{r}
+# In Experiment 2, participants have only partial knowledge: they know the number of red balls in each jar but do not know the complete color distributions.
+# Therefore, participants do not have direct access to the exact private knowledge k_i held by each social agent. Instead, they consider a finite set of candidate knowledge states k^(m) that are consistent with their own partial knowledge kp.
+
+# The posterior should be computed as:
+# P(c | s1, s2, k^p) = sum_d sum_m P(c | d, k^(m), k^p) P(d, k^(m) | s1, s2, k^p) Here k^(m) = (k1^(m),k2^(m))
+# with
+# P(d, k^(m)| s1, s2, k^p) ~ P(s1, s2 | d, k^(m)) P(d, k^(m) | k^p)
+# P(s1, s2 | d, k^(m)) = P(s1| d, k1^(m)) * P(s2| d, k2^(m)) * P(k1^(m)|k^(m)) * P(k2^(m)|k^(m)) 
+#                      = P(s1| d, k1^(m)) * P(s2| d, k2^(m))
+
+# P(d, k^(m) | k^p) = P(k^(m) | k^p ) * P(d|k^(m), k^p)
+#   d          = latent world state (drawn ball color)
+#   c          = target category (jar identity)
+#   s_i        = judgment of agent i
+#   k^p        = participant's partial knowledge
+#   k_i^(m)    = candidate private knowledge state of agent i
+
+
+# ------------------------------------------------------------
+# Experiment 2 mentalizing posterior
+# ------------------------------------------------------------
+
+posterior_mentalizing <- function(
+    jar1, jar2,
+    s1, s2,
+    k1, k2,
+    tau) {
+
+  total_balls <- 10
+  colors <- c("blue", "yellow", "red")
+
+  # ----------------------------------------------------------
+  # Participant's partial knowledge k^p
+  # ----------------------------------------------------------
+  #
+  # Participants directly observe only the number of red balls.
+  # Therefore, the numbers of blue and yellow balls remain
+  # uncertain.
+  #
+  # We enumerate all complete jar distributions consistent with
+  # k^p, assuming that each jar contains at least one blue and
+  # one yellow ball.
+
+  red1 <- jar1[["red"]]
+  red2 <- jar2[["red"]]
+
+  jar1_blue_range <- seq(
+    1,
+    total_balls - red1 - 1
+  )
+
+  jar2_blue_range <- seq(
+    1,
+    total_balls - red2 - 1
+  )
+
+  # ----------------------------------------------------------
+  # Hypothesis space
+  # ----------------------------------------------------------
+  #
+  # Each hypothesis specifies:
+  #
+  #   1. a candidate complete distribution consistent with k^p;
+  #   2. a candidate latent world state d (ball color);
+  #   3. a candidate category c (jar identity).
+  #
+  # Each candidate complete distribution induces corresponding
+  # candidate private knowledge states k_1^(m) and k_2^(m).
+
+  hypotheses <- expand.grid(
+    jar1_blue = jar1_blue_range,
+    jar2_blue = jar2_blue_range,
+    color = colors,
+    chosen_jar = 1:2,
+    KEEP.OUT.ATTRS = FALSE,
+    stringsAsFactors = FALSE
+  ) |>
+
+    mutate(
+
+      # Reconstruct each possible complete distribution of Jar 1
+      # consistent with participant knowledge k^p.
+      jar1_h = Map(
+        function(blue) {
+          c(
+            blue = blue,
+            yellow = total_balls - red1 - blue,
+            red = red1
+          )
+        },
+        jar1_blue
+      ),
+
+      # Reconstruct each possible complete distribution of Jar 2.
+      jar2_h = Map(
+        function(blue) {
+          c(
+            blue = blue,
+            yellow = total_balls - red2 - blue,
+            red = red2
+          )
+        },
+        jar2_blue
+      ),
+
+      # For each candidate knowledge configuration k^(m),
+      # calculate the probability of drawing a ball of color d: P(d | k^(m), k^p)
+      prior_d = pmap_dbl(
+        list(jar1_h, jar2_h, color),
+        function(j1, j2, d) {
+
+          (j1[[d]] + j2[[d]]) /
+            (2 * total_balls)
+        }
+      ),
+
+      # Conditional on the candidate world state d and candidate
+      # complete distribution k^(m), calculate the probability
+      # that the ball originated from each jar. P(c | d, k^(m), k^p)
+      #
+      # Here, c corresponds to the identity of the sampled jar.
+
+      p_category = pmap_dbl(
+        list(chosen_jar, jar1_h, jar2_h, color),
+        function(c, j1, j2, d) {
+
+          count1 <- j1[[d]]
+          count2 <- j2[[d]]
+
+          p_jar <- c(count1, count2) /
+            (count1 + count2)
+
+          p_jar[c]
+        }
+      )
+    ) |>
+    rowwise() |>
+    # Agent response likelihoods P(s1 | d, k_1^(m)), P(s2 | d, k_2^(m))
+    mutate(
+      # P(s1 | d, k_1^(m))
+      ll_s1 = agent_jar_likelihood(
+        jar1 = jar1_h,
+        jar2 = jar2_h,
+        color = color,
+        known_color = k1,
+        response = s1,
+        total_balls = total_balls,
+        tau = tau
+      ),
+    
+      # P(s2 | d, k_2^(m))
+      ll_s2 = agent_jar_likelihood(
+        jar1 = jar1_h,
+        jar2 = jar2_h,
+        color = color,
+        known_color = k2,
+        response = s2,
+        total_balls = total_balls,
+        tau = tau
+      ),
+    
+     
+      # w(c, d, k^(m), s1, s2)
+      #   ~ P(c | d, k^(m), k^p)
+      #     P(s1 | d, k_1^(m))
+      #     P(s2 | d, k_2^(m))
+      #     P(d | k^(m), k^p)
+      weight = p_category * ll_s1 * ll_s2 * prior_d
+    ) |>
+    ungroup()
+
+
+  # Marginalization
+
+  final <- hypotheses |>
+    group_by(chosen_jar) |>
+    summarise(
+      weight = sum(weight),
+      .groups = "drop"
+    ) |>
+    mutate(
+      posterior = weight / sum(weight)
+    )
+
+
+  # Return the posterior probability that Jar 2 was sampled.
+  final |>
+    filter(chosen_jar == 2) |>
+    pull(posterior)
+}
+
+
+
+w_list2 <- function(tau) {
+
+  # True jar distributions used to construct the experimental
+  # stimuli. Participants themselves observe only the red-ball
+  # counts when performing the task.
+
+  jar1_list <- list(
+    c(blue = 2, yellow = 7, red = 1),
+    c(blue = 1, yellow = 1, red = 8),
+    c(blue = 1, yellow = 3, red = 6),
+    c(blue = 5, yellow = 4, red = 1)
+  )
+
+  jar2_list <- list(
+    c(blue = 1, yellow = 1, red = 8),
+    c(blue = 1, yellow = 7, red = 2),
+    c(blue = 2, yellow = 1, red = 7),
+    c(blue = 1, yellow = 2, red = 7)
+  )
+
+  # Judgments in the different-knowledge condition:
+  # one agent has access to blue-ball information and the other
+  # has access to yellow-ball information.
+  response_div <- list(
+    c("Type2", "Type2"),
+    c("Type2", "Type1"),
+    c("Type2", "Type2"),
+    c("Type1", "Type2")
+  )
+
+
+  # Judgments in the same-knowledge condition:
+  # both agents have access to the same color distribution.
+  response_nodiv <- list(
+    c("Type2", "Type2"),
+    c("Type1", "Type1"),
+    c("Type2", "Type2"),
+    c("Type1", "Type1")
+  )
+
+
+  # Knowledge domain shared by the two agents in each
+  # no-diversity trial pair.
+  same_knowledge <- c(
+    "blue",
+    "yellow",
+    "blue",
+    "blue"
+  )
+
+
+  posterior <- numeric(8)
+  for (i in 1:4) {
+
+    jar1 <- jar1_list[[i]]
+    jar2 <- jar2_list[[i]]
+
+
+    # --------------------------------------------------------
+    # Same-knowledge condition
+    # --------------------------------------------------------
+
+    posterior[2 * i - 1] <- posterior_mentalizing(
+      jar1 = jar1,
+      jar2 = jar2,
+      s1 = response_nodiv[[i]][1],
+      s2 = response_nodiv[[i]][2],
+      k1 = same_knowledge[i],
+      k2 = same_knowledge[i],
+      tau = tau
+    )
+
+
+    # Different-knowledge condition
+    posterior[2 * i] <- posterior_mentalizing(
+      jar1 = jar1,
+      jar2 = jar2,
+      s1 = response_div[[i]][1],
+      s2 = response_div[[i]][2],
+      k1 = "blue",
+      k2 = "yellow",
+      tau = tau
+    )
+  }
+  posterior
+}
+
+
+# Model predictions
+w_list2(1000)
+```
+
+```{r}
+# ============================================================
+# Experiment 3
+# ============================================================
+#
+# Latent world state d:
+#   joint ear-foot feature configuration
+#
+# Target category c:
+#   alien Type 1 or Type 2
+#
+# Agent knowledge k_i:
+#   ear expertise or foot expertise
+#
+# Agent judgment s_i:
+#   Type 1 or Type 2
+#
+# The mentalizing model computes:
+#
+# P(c | s1, s2)
+#   ∝ sum_d
+#       P(s1 | d, k1)
+#       P(s2 | d, k2)
+#       P(d | c)
+#       P(c)
+
+
+# ------------------------------------------------------------
+# Construct participant and expert knowledge
+# ------------------------------------------------------------
+
+make_alien_knowledge <- function(a1, b2, total = 10) {
+
+  # Full joint feature distribution available to participants.
+  #
+  # Rows correspond to:
+  #   ear = 0, foot = 0
+  #   ear = 1, foot = 0
+  #   ear = 0, foot = 1
+  #   ear = 1, foot = 1
+
+  full <- expand.grid(
+    ear = c(0, 1),
+    foot = c(0, 1)
+  )
+
+  full$Type1 <- c(
+    a1,
+    0,
+    0,
+    total - a1
+  )
+
+  full$Type2 <- c(
+    0,
+    b2,
+    total - b2,
+    0
+  )
+
+  # Ear experts marginalize over foot size.
+  ear <- data.frame(
+    feature = c(0, 1),
+    Type1 = c(
+      a1,
+      total - a1
+    ),
+    Type2 = c(
+      total - b2,
+      b2
+    )
+  )
+
+  # Foot experts marginalize over ear size.
+  foot <- data.frame(
+    feature = c(0, 1),
+    Type1 = c(
+      a1,
+      total - a1
+    ),
+    Type2 = c(
+      b2,
+      total - b2
+    )
+  )
+
+  list(
+    full = full,
+    ear = ear,
+    foot = foot
+  )
+}
+
+
+# ------------------------------------------------------------
+# Expert response likelihood
+# ------------------------------------------------------------
+
+expert_likelihood <- function(
+    response,
+    feature_value,
+    expert_type,
+    knowledge,
+    tau) {
+
+  expert_knowledge <- knowledge[[expert_type]]
+
+  idx <- expert_knowledge$feature == feature_value
+
+  count_type1 <- expert_knowledge$Type1[idx]
+  count_type2 <- expert_knowledge$Type2[idx]
+
+  p_type1 <- count_type1 /
+    (count_type1 + count_type2)
+
+  response_prob <- softmax(
+    c(p_type1, 1 - p_type1),
+    tau
+  )
+
+  response_index <- match(
+    response,
+    c("Type1", "Type2")
+  )
+
+  response_prob[response_index]
+}
+
+
+# ------------------------------------------------------------
+# Experiment 3 mentalizing posterior
+# ------------------------------------------------------------
+
+posterior_exp3 <- function(
+    a1, b2,
+    s1, s2,
+    expert1, expert2,
+    tau) {
+
+  total <- 10
+  knowledge <- make_alien_knowledge(a1, b2, total)
+
+  # Hypothesis space:
+  # 2 ear states x 2 foot states x 2 alien types = 8 hypotheses.
+  hypotheses <- expand.grid(
+    ear = c(0, 1),
+    foot = c(0, 1),
+    type = c("Type1", "Type2"),
+    stringsAsFactors = FALSE
+  )
+
+  weights <- numeric(nrow(hypotheses))
+
+  for (i in seq_len(nrow(hypotheses))) {
+
+    ear_state <- hypotheses$ear[i]
+    foot_state <- hypotheses$foot[i]
+    alien_type <- hypotheses$type[i]
+
+    idx <-
+      knowledge$full$ear == ear_state &
+      knowledge$full$foot == foot_state
+
+    # Prior over the joint feature state and alien type:
+    #
+    # P(d, c) = P(d | c) P(c)
+    #
+    # Both alien types are equally likely a priori.
+    p_state_given_type <-
+      knowledge$full[[alien_type]][idx] / total
+
+    p_type <- 0.5
+
+    prior <- p_state_given_type * p_type
+
+    # Select the feature visible to each expert.
+    feature1 <- if (expert1 == "ear") {
+      ear_state
+    } else {
+      foot_state
+    }
+
+    feature2 <- if (expert2 == "ear") {
+      ear_state
+    } else {
+      foot_state
+    }
+
+    # P(s1 | d, k1)
+    ll_s1 <- expert_likelihood(
+      response = s1,
+      feature_value = feature1,
+      expert_type = expert1,
+      knowledge = knowledge,
+      tau = tau
+    )
+
+    # P(s2 | d, k2)
+    ll_s2 <- expert_likelihood(
+      response = s2,
+      feature_value = feature2,
+      expert_type = expert2,
+      knowledge = knowledge,
+      tau = tau
+    )
+
+    # Conditional independence:
+    #
+    # P(s1, s2 | d, k1, k2)
+    #   = P(s1 | d, k1) P(s2 | d, k2)
+    weights[i] <- prior * ll_s1 * ll_s2
+  }
+
+  # Marginalize over joint ear-foot states.
+  type_weights <- tapply(
+    weights,
+    hypotheses$type,
+    sum
+  )
+
+  posterior <- type_weights / sum(type_weights)
+
+  # Return P(Type 2 | s1, s2)
+  unname(posterior["Type2"])
+}
+
+
+# ------------------------------------------------------------
+# Experiment 3 trial predictions
+# ------------------------------------------------------------
+
+w_list3 <- function(tau) {
+
+  response1 <- c(
+    "Type1", "Type2", "Type2", "Type1",
+    "Type1", "Type2", "Type1", "Type2",
+    "Type1", "Type2", "Type2", "Type1",
+    "Type1", "Type2", "Type1", "Type2"
+  )
+
+  response2 <- c(
+    "Type1", "Type2", "Type1", "Type2",
+    "Type1", "Type2", "Type1", "Type2",
+    "Type1", "Type2", "Type1", "Type2",
+    "Type1", "Type2", "Type1", "Type2"
+  )
+
+  a1 <- 2
+  b2 <- 3
+
+  posterior <- numeric(16)
+
+  for (i in 1:16) {
+
+    if (i %in% 1:4) {
+
+      # One ear expert and one foot expert.
+      # Preserve the original response ordering for Trials 1-4.
+      posterior[i] <- posterior_exp3(
+        a1, b2,
+        s1 = response2[i],
+        s2 = response1[i],
+        expert1 = "ear",
+        expert2 = "foot",
+        tau = tau
+      )
+
+    } else if (i %in% c(5, 6, 13, 14)) {
+
+      # Two ear experts.
+      posterior[i] <- posterior_exp3(
+        a1, b2,
+        s1 = response1[i],
+        s2 = response2[i],
+        expert1 = "ear",
+        expert2 = "ear",
+        tau = tau
+      )
+
+    } else if (i %in% c(7, 8, 15, 16)) {
+
+      # Two foot experts.
+      posterior[i] <- posterior_exp3(
+        a1, b2,
+        s1 = response1[i],
+        s2 = response2[i],
+        expert1 = "foot",
+        expert2 = "foot",
+        tau = tau
+      )
+
+    } else {
+
+      # One ear expert and one foot expert.
+      posterior[i] <- posterior_exp3(
+        a1, b2,
+        s1 = response1[i],
+        s2 = response2[i],
+        expert1 = "ear",
+        expert2 = "foot",
+        tau = tau
+      )
+    }
+  }
+
+  posterior
+}
+
+
+w_list3(1000)
+```

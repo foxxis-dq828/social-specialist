@@ -1,0 +1,33 @@
+cbm_hbi_hbi                                       14-Sep-2026 21:14:43
+Running hierarchical bayesian inference (HBI)...
+
+HBI has been initialized according to
+	lap_mentalizing.mat [for model 1]
+	lap_vt.mat [for model 2]
+	lap_dw.mat [for model 3]
+	lap_kw.mat [for model 4]
+	lap_baseline.mat [for model 5]
+ 
+Number of samples: 96
+Number of models: 5
+======================================================================
+Iteration 01
+Iteration 02
+	model frequencies (percent)
+	model 1: 19.0| model 2: 18.0| model 3: 17.1| model 4: 18.2| model 5: 27.7| 
+                                                           dL:   15.46
+                                                           dm:   72.28
+                                                           dx:    0.11
+Iteration 03
+	model frequencies (percent)
+	model 1: 17.9| model 2: 15.7| model 3: 13.6| model 4: 16.2| model 5: 36.6| 
+                                                           dL:    4.88
+                                                           dm:    8.90
+                                                           dx:    0.04
+Iteration 04
+	model frequencies (percent)
+	model 1: 16.3| model 2: 13.5| model 3: 10.4| model 4: 14.1| model 5: 45.8| 
+                                                           dL:    4.18
+                                                           dm:    9.18
+                                                           dx:    0.01
+                                                          Converged :]

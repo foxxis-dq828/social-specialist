@@ -1,0 +1,30 @@
+cbm_hbi_hbi                                       14-Sep-2026 19:35:28
+Running hierarchical bayesian inference (HBI)- null mode...
+
+HBI has been initialized according to
+	lap_mentalizing.mat [for model 1]
+	lap_vt.mat [for model 2]
+	lap_dw.mat [for model 3]
+	lap_kw.mat [for model 4]
+	lap_baseline.mat [for model 5]
+ 
+Number of samples: 87
+Number of models: 5
+======================================================================
+Iteration 01
+Iteration 02
+                                                           dL:    6.71
+                                                           dx:    0.17
+Iteration 03
+                                                           dL:    0.10
+                                                           dx:    0.05
+Iteration 04
+                                                           dL:    0.30
+                                                           dx:    0.02
+Iteration 05
+                                                           dL:    0.31
+                                                           dx:    0.01
+Iteration 06
+                                                           dL:    0.27
+                                                           dx:    0.01
+                                                          Converged :]
