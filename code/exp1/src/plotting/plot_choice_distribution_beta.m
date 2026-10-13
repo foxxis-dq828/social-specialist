@@ -9,14 +9,15 @@ function plot_choice_distribution_beta(data, cbm, bestModelPerSubj)
 %   (max responsibility ≥ 0.5) are included.  
 
 % Configuration
-confThr   = 0.50;
-minGroupN = 6;
+confThr   = 0.6;
+minGroupN = 5;
 strategyNames = {'Mentalizing','Level0','DiversityHeuristic','ColourModel','Baseline'};
 nModels = numel(strategyNames);
 
 % Number of subjects and trials
 N = numel(data);
 T = numel(data{1}.y);
+trialOrder = [1 2 3 4 7 8 5 6]; % Exp1
 
 % Collect actual responses into an N×T matrix
 choicesMat = nan(N, T);
@@ -58,17 +59,18 @@ for gi = 1:nGroups
     end
     % Loop through trials
     for t = 1:T
+        originalTrial = trialOrder(t);
         subplot(nGroups, T, plotIdx);
         plotIdx = plotIdx + 1;
         % Actual responses for this trial and group
-        y = choicesMat(grpIdx, t);
+        y = choicesMat(grpIdx, originalTrial);
         y = y(~isnan(y));
         % Histogram counts for categories 1..6
         counts = histcounts(y, 0.5:1:6.5);  % bin edges at 0.5:1:6.5
         bar(1:6, counts, 'FaceColor',[0.6 0.6 0.9], 'EdgeColor','none');
         hold on;
         % Predicted probabilities for this trial using mean parameters
-        pPred = compute_predicted_bin_probs(modelIdx, meanParams, t);
+        pPred = compute_predicted_bin_probs(modelIdx, meanParams, originalTrial);
         % Scale to expected counts (same total as actual)
         predCounts = pPred * numel(y);
         plot(1:6, predCounts, 'r-', 'LineWidth',2);

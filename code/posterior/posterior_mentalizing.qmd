@@ -261,7 +261,7 @@ exp2
 #   k^p        = participant's partial knowledge
 #   k_i^(m)    = candidate private knowledge state of agent i
 
-
+# For example, if the ideal reasoner knows that Jar I and Jar II contain 2 and 8 red balls respectively, and that each jar contains 10 balls in total, they would generate hypotheses about the knowledge state of the blue agent by considering all possible blue-ball distributions consistent with these constraints, such as {I:7, II:1}, {I:6, II:1}, {I:5, II:1},...,{I:1, II:1}. The model then marginalizes over this complete hypothesis space of the blue agent's knowledge state P(k_{blue}^{(m)}|k^p) to  compute P(s_i | d, k^p). The case for the yellow agent is symmetric.
 # ------------------------------------------------------------
 # Experiment 2 mentalizing posterior
 # ------------------------------------------------------------

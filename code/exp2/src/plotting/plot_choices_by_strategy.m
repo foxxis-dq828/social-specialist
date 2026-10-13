@@ -3,7 +3,7 @@ function plot_choices_by_strategy(data, cbm, bestModelPerSubj)
 %
 %   PLOT_CHOICES_BY_STRATEGY(DATA, CBM, BESTMODELPERSUBJ) groups
 %   participants according to their best‑fit model (strategy), filters out
-%   uncertain assignments (max responsibility < 0.5), and keeps only those
+%   uncertain assignments (max responsibility < 0.6), and keeps only those
 %   strategies with more than five participants.  For each remaining
 %   strategy, the function computes the mean Likert rating for each of the
 %   eight trials and plots it with a shaded error band.  It also computes
@@ -12,11 +12,11 @@ function plot_choices_by_strategy(data, cbm, bestModelPerSubj)
 %   dashed line.  Colours distinguish different strategies.
 
 % Configuration: threshold for being considered “certain” and minimum group size
-confThr   = 0.50;
-minGroupN = 6;  % include groups with at least 6 subjects
+confThr   = 0.6;
+minGroupN = 5;  % include groups with at least 6 subjects
 
 % Strategy names in the order of cbm.output.responsibility columns
-strategyNames = {'Mentalizing','VT','DW','KW','Baseline'};
+strategyNames = {'Mentalizing','Level-0','Level-1 DW','Level-1 KW','Baseline'};
 nModels = numel(strategyNames);
 
 % Number of subjects and trials
@@ -47,7 +47,14 @@ if isempty(groupsToPlot)
 end
 
 % Prepare colour palette
-colors = lines(numel(groupsToPlot));
+% Fixed colours in model order: M, VT, DW, KW, Baseline
+strategyColors = [
+    0.070  0.465  0.710;   % M
+    0.830  0.350  0.140;   % VT
+    0.910  0.570  0.170;   % DW
+    0.850  0.685  0.140;   % KW
+    0.500  0.500  0.500    % Baseline
+];
 
 % Create figure
 figure;
@@ -77,10 +84,14 @@ for gi = 1:numel(groupsToPlot)
         end
     end
     predictedMean = nanmean(predictedMatGrp, 1);
-    
+    trialOrder = [4 3 2 1 8 7 6 5]; % Exp2
+    meanChoices   = meanChoices(trialOrder);
+    seChoices     = seChoices(trialOrder);
+    predictedMean = predictedMean(trialOrder);
+
     % Plot actual mean with shaded error band
     x = 1:T;
-    c = colors(gi, :);
+    c = strategyColors(modelIdx, :);
     upper = meanChoices + seChoices;
     lower = meanChoices - seChoices;
     fill([x, fliplr(x)], [upper, fliplr(lower)], c, 'FaceAlpha',0.2, 'EdgeColor','none');

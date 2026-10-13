@@ -5,12 +5,12 @@ function plot_choice_distribution_beta(data, cbm, bestModelPerSubj)
 %   series of bar charts showing the distribution of actual choices (1..6)
 %   made by participants for each trial and strategy, together with the
 %   predicted distribution derived from the mean parameters of that
-%   strategy. Only strategies with at least six participants (max
+%   strategy. Only strategies with at least 5 participants (max
 %   responsibility >= 0.5) are included.
 
 % Configuration
-confThr   = 0.50;
-minGroupN = 6;
+confThr   = 0.6;
+minGroupN = 5;
 strategyNames = {'Mentalizing','Level0','DiversityHeuristic','ColourModel','Baseline'};
 nModels = numel(strategyNames);
 

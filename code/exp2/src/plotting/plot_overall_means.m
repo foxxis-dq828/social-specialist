@@ -36,6 +36,10 @@ for s = 1:N
     end
 end
 predictedMean = nanmean(predictedMat, 1);
+trialOrder = [4 3 2 1 8 7 6 5]; % Exp2
+meanChoices   = meanChoices(trialOrder);
+seChoices     = seChoices(trialOrder);
+predictedMean = predictedMean(trialOrder);
 
 % Plot
 figure;
