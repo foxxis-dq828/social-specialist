@@ -45,7 +45,7 @@ The substantive models use beta distributions to generate probabilities over six
 For the MATLAB analyses:
 
 - MATLAB with Live Script support.
-- The Computational and Behavioral Modeling (CBM) toolbox ([CBMtoolbox](https://github.com/payampiray/CBMtoolbox)).
+- The Computational and Behavioral Modeling (CBM) toolbox ([CBM toolbox](https://github.com/payampiray/cbm)).
 - Optimization Toolbox.
 - Statistics and Machine Learning Toolbox.
 - Parallel Computing Toolbox for the parallel model recovery workflow.
@@ -63,3 +63,9 @@ For the R analysis:
 The current configuration uses 50 repetitions per generating model for each experiment and an eight-worker parallel pool. Update the experiment directories, CBM location, and result directory in the settings section before running it.
 
 Saved recovery outputs are stored under `code/model recovery/result/`.
+
+## Citation
+
+Please cite the following paper when using the CBM toolbox:
+
+Piray et al., "Hierarchical Bayesian inference for concurrent model fitting and comparison for group studies", *PLoS Computational Biology*, 2019.
